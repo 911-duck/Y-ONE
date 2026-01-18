@@ -21,6 +21,8 @@ const uint8_t pin_BUT_LT = 2;
 const uint8_t pin_BUT_RT = 7;
 const uint8_t pin_BUT_MN = 12;
 
+const uint8_t pin_POT = A4;
+
 uint8_t ADR_left_or_right_hand = 0;
 uint8_t ADR_sensitive = 10;
 uint8_t ADR_dataTransfer = 20;
