@@ -1,8 +1,10 @@
 #include "config.h"
 #include "bitmap.h"
+#include "simbols.h"
+#include "sensor.h"
 
 void eepromGet() {
-  EEPROM.get(ADR_left_or_right_hand,left_or_right_hand);
+  EEPROM.get(ADR_left_or_right_hand, left_or_right_hand);
   EEPROM.get(ADR_sensitive, sensitive);
   EEPROM.get(ADR_dataTransfer, dataTransfer);
   EEPROM.get(ADR_servoSpeed, servoSpeed);
@@ -15,18 +17,22 @@ void eepromSave() {
   EEPROM.put(ADR_servoSpeed, servoSpeed);
 }
 
+Sensor pXL = Sensor(pin_XL, 0);
+Sensor pYL = Sensor(pin_YL, 0);
+Sensor pXR = Sensor(pin_XR, 0);
+Sensor pYR = Sensor(pin_YR, 0);
+Sensor pSR = Sensor(pin_SW_R, 1, INPUT_PULLUP);
+Sensor pSL = Sensor(pin_SW_L, 1, INPUT_PULLUP);
+Sensor pBD = Sensor(pin_BUT_DN, 1, INPUT_PULLUP);
+Sensor pBL = Sensor(pin_BUT_LT, 1, INPUT_PULLUP);
+Sensor pBM = Sensor(pin_BUT_MN, 1, INPUT_PULLUP);
+Sensor pBU = Sensor(pin_BUT_UP, 1, INPUT_PULLUP);
+Sensor pVR = Sensor(pin_BUT_RT, 1, INPUT_PULLUP);
+Sensor pot = Sensor(pin_POT, 0);
+
 void setup() {
-  pinMode(pin_XL, INPUT);
-  pinMode(pin_YL, INPUT);
-  pinMode(pin_XR, INPUT);
-  pinMode(pin_YR, INPUT);
-  pinMode(pin_SW_R, INPUT_PULLUP);
-  pinMode(pin_SW_L, INPUT_PULLUP);
-  pinMode(pin_BUT_DN, INPUT_PULLUP);
-  pinMode(pin_BUT_LT, INPUT_PULLUP);
-  pinMode(pin_BUT_MN, INPUT_PULLUP);
-  pinMode(pin_BUT_UP, INPUT_PULLUP);
-  pinMode(pin_BUT_RT, INPUT_PULLUP);
+
+  pot.setMaxMin(0, simbolsLength);
 
   eepromGet();
 
@@ -50,7 +56,7 @@ void bluetoothControl() {
   display.drawBitmap(0, 0, Rohit, 128, 64, 1);
   display.display();
   while (true) {
-    if (digitalRead(pin_BUT_DN) == false) {
+    if (pBD.read()) {
       display.clearDisplay();
       display.drawBitmap(0, 0, Dhoni, 128, 64, 1);
       display.display();
@@ -61,15 +67,15 @@ void bluetoothControl() {
     uint16_t L_value[] = { 0, 0 };
 
     if (left_or_right_hand == 1) {
-      R_value[0] = analogRead(pin_XR);
-      R_value[1] = analogRead(pin_YR);
-      L_value[0] = analogRead(pin_XL);
-      L_value[1] = analogRead(pin_YL);
+      R_value[0] = pXR.read();
+      R_value[1] = pYR.read();
+      L_value[0] = pXL.read();
+      L_value[1] = pYL.read();
     } else {
-      R_value[0] = analogRead(pin_XL);
-      R_value[1] = analogRead(pin_YL);
-      L_value[0] = analogRead(pin_XR);
-      L_value[1] = analogRead(pin_YR);
+      R_value[0] = pXL.read();
+      R_value[1] = pYL.read();
+      L_value[0] = pXR.read();
+      L_value[1] = pYR.read();
     }
 
     if (L_value[0] > 1024 - sensitive && L_value[1] < 1024 - sensitive && L_value[1] > sensitive) {
@@ -100,7 +106,7 @@ void bluetoothControl() {
       delay(servoSpeed);
     }
 
-    if (digitalRead(pin_SW_R) == false || digitalRead(pin_SW_L) == false) {
+    if (pSR.read() || pSL.read()) {
       Serial.print("l");
       delay(500);
     }
@@ -108,26 +114,47 @@ void bluetoothControl() {
   }
 }
 
-void autoPilot() {
-  display.clearDisplay();
-  display.drawBitmap(0, 0, epd_bitmap_Group_300, 128, 64, 1);
-  display.display();
-  Serial.print("m");
+String outputV;
+
+bool post;
+
+void AIhelper() {
   while (true) {
-    if (digitalRead(pin_BUT_DN) == false) {
+    display.clearDisplay();
+    display.setTextSize(1);               // Draw 2X-scale text
+    display.setTextColor(SSD1306_BLACK);  // Draw 'inverse' text
+    display.setCursor(1, 1);
+    display.println(F("AI: hi, can i help you"));
+
+    if (!post) {
+      if (pBL.read()) outputV += simbols[pot.read()];
+      display.setCursor(1, 50);
+      display.print("YOU: ");
+      display.print(outputV);
+      display.println(simbols[pot.read()]);
+    } else {
+      if (pBL.read()) {
+        post = 0;
+        outputV = "";
+      }
+    }
+
+    if (pBM.read()) post = 1;
+    if (pBD.read()) {
       display.clearDisplay();
       display.drawBitmap(0, 0, Dhoni, 128, 64, 1);
       display.display();
       return;
     }
   }
+  display.display();
 }
 
 uint8_t point = 0;
 
 void informationPrint() {
   while (true) {
-    if (digitalRead(pin_BUT_DN) == false) {
+    if (pBD) {
       return;
     }
     display.clearDisplay();
@@ -148,11 +175,11 @@ void drawPoint() {
 
 uint16_t Regut(uint16_t val, uint16_t max, uint16_t min, String name) {
   while (true) {
-    if (digitalRead(pin_BUT_LT) == false) {
+    if (pBL.read()) {
       if (val == min) val = max;
       else val--;
       delay(10);
-    } else if (digitalRead(pin_BUT_RT) == false) {
+    } else if (pBR.read()) {
       if (val == max) val = min;
       else val++;
       delay(10);
@@ -168,7 +195,7 @@ uint16_t Regut(uint16_t val, uint16_t max, uint16_t min, String name) {
     display.print(val);
     display.print(">");
     display.display();  // Show initial text
-    if (digitalRead(pin_BUT_DN) == false) {
+    if (pBD.read()) {
       return val;
     }
   }
@@ -205,14 +232,14 @@ void checkEvent() {
 }
 
 void checkPointPosition() {
-  if (digitalRead(pin_BUT_UP) == false) {
+  if (pBU.read()) {
     if (point == 0) point = 4;
     else point--;
-  } else if (digitalRead(pin_BUT_DN) == false) {
+  } else if (pBD.read()) {
     if (point == 4) point = 0;
     else point++;
   }
-  if (digitalRead(pin_BUT_MN) == false) {
+  if (pBM.read()) {
     checkEvent();
   }
   delay(100);
@@ -220,7 +247,7 @@ void checkPointPosition() {
 
 void settings() {
   while (true) {
-    if (digitalRead(pin_BUT_LT) == false) {
+    if (pBL.read()) {
       display.clearDisplay();
       display.drawBitmap(0, 0, Dhoni, 128, 64, 1);
       display.display();
@@ -245,11 +272,11 @@ void settings() {
 }
 
 void loop() {
-  if (digitalRead(pin_BUT_LT) == false) {
+  if (pBL.read() == false) {
     bluetoothControl();
-  } else if (digitalRead(pin_BUT_MN) == false) {
+  } else if (pBM.read() == false) {
     autoPilot();
-  } else if (digitalRead(pin_BUT_RT) == false) {
+  } else if (pBR.read() == false) {
     settings();
   }
 }
